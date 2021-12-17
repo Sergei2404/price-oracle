@@ -213,6 +213,67 @@ impl Contract {
         }
     }
 
+    pub fn report_prices_triple(&mut self, prices: Vec<AssetPrices>) {
+        assert!(!prices.is_empty());
+        let max_percentage:u128 = 40; //my
+        let min_percentage:u128 = 28; //my
+
+        let oracle_id = env::predecessor_account_id();
+        let timestamp = env::block_timestamp();
+
+        // Oracle stats
+        let mut oracle = self.internal_get_oracle(&oracle_id).expect("Not an oracle");
+        oracle.last_report = timestamp;
+        oracle.price_reports += prices.len() as u64;
+
+        if oracle.last_near_claim + NEAR_CLAIM_DURATION <= timestamp {
+            oracle.last_near_claim = timestamp;
+            Promise::new(oracle_id.clone()).transfer(NEAR_CLAIM);
+        }
+
+        self.internal_set_oracle(&oracle_id, oracle);
+
+        // Updating prices
+        for AssetPrices { asset_id, price_b, price_cm, price_cg} in prices {
+            price_b.assert_valid();
+            price_cm.assert_valid();
+            price_cg.assert_valid();
+            let mut asset = self.internal_get_asset(&asset_id).expect("Unknown asset");
+            let mut middle_price:u128 = (price_b.get_balance() + price_cg.get_balance() + price_cm.get_balance())/3;
+            let firtst_price_percentage:u128 = (price_b.get_balance() * 100 as u128)/middle_price;
+            let second_price_percentage:u128 = (price_cm.get_balance() * 100 as u128)/middle_price;
+            let third_price_percentage:u128 = (price_cg.get_balance() * 100 as u128)/middle_price;
+            if firtst_price_percentage > max_percentage {
+                if second_price_percentage > max_percentage {
+                    middle_price = (price_b.get_balance() + price_cm.get_balance())/2;
+                }else if third_price_percentage > max_percentage{
+                    middle_price = (price_b.get_balance() + price_cg.get_balance())/2;
+                } else{
+                    middle_price = (price_cg.get_balance() + price_cm.get_balance())/2;
+                }
+            }else if firtst_price_percentage < min_percentage {
+                if second_price_percentage < min_percentage{
+                    middle_price = (price_b.get_balance() + price_cm.get_balance())/2;
+                }else if third_price_percentage < min_percentage{
+                    middle_price = (price_b.get_balance() + price_cg.get_balance())/2;
+                } else{
+                    middle_price = (price_cg.get_balance() + price_cm.get_balance())/2;
+                }
+            }
+
+            asset.remove_report(&oracle_id);
+            asset.add_report(Report {
+                oracle_id: oracle_id.clone(),
+                timestamp,
+                price: Price{
+                    multiplier: middle_price,
+                    decimals: price_b.get_decimals()
+                },
+            });
+            self.internal_set_asset(&asset_id, asset);
+        }
+    }
+
     #[payable]
     pub fn oracle_call(
         &mut self,
@@ -243,3 +304,7 @@ impl Contract {
         assert_one_yocto();
     }
 }
+
+// near call price.rkonoval.testnet report_prices_triple '{"prices":[{"asset_id":"RUS", "price_b":{"multiplier":"2", "decimals":7}, "price_cm":{"multiplier":"6", "decimals":7}, "price_cg":{"multiplier":"4", "decimals":7}}]}' --accountId sergei24.testnet
+//47.123.338.425.891.180.000.000
+//340.282.366.920.938.586.008.062.602.462.446.642.046

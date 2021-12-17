@@ -26,6 +26,15 @@ pub struct AssetPrice {
 
 #[derive(Serialize, Deserialize)]
 #[serde(crate = "near_sdk::serde")]
+pub struct AssetPrices {
+    pub asset_id: AssetId,
+    pub price_b: Price,
+    pub price_cm: Price,
+    pub price_cg: Price,
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(crate = "near_sdk::serde")]
 pub struct AssetOptionalPrice {
     pub asset_id: AssetId,
     pub price: Option<Price>,

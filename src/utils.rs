@@ -8,8 +8,8 @@ const MAX_VALID_DECIMALS: u8 = 77;
 #[serde(crate = "near_sdk::serde")]
 pub struct Price {
     #[serde(with = "u128_dec_format")]
-    multiplier: Balance,
-    decimals: u8,
+    pub multiplier: Balance,
+    pub decimals: u8,
 }
 
 // 5 NEAR = 5 * 10**24 "wrap.near"
@@ -23,6 +23,12 @@ pub struct Price {
 impl Price {
     pub fn assert_valid(&self) {
         assert!(self.decimals <= MAX_VALID_DECIMALS);
+    }
+    pub fn get_balance(&self) -> Balance {
+        self.multiplier
+    }
+    pub fn get_decimals(&self) -> u8 {
+        self.decimals
     }
 }
 
